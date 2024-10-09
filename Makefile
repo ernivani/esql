@@ -39,7 +39,9 @@ run:
 	$(OUT)
 
 install:
+	$(CC) $(SRCS) $(INCLUDES) -o $(OUT)
 	@sudo $(COPY) $(OUT) /usr/local/bin
+	@echo Installed
 
 
 clean:

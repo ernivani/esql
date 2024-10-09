@@ -1,4 +1,6 @@
-USE nijel;
+CREATE DATABASE boutique;
+
+USE boutique;
 
 CREATE TABLE alchool (nom:varchar(50),pourcentage:int,couleur:varchar(20),prix:int);
 
@@ -22,11 +24,5 @@ SELECT * FROM alchool WHERE pourcentage >= 35 AND pourcentage <= 45;
 SELECT * FROM alchool WHERE (couleur = 'dark' OR couleur = 'amber') AND prix < 25;
 
 SELECT * FROM alchool WHERE nom = 'vodka' AND prix > 15;
-
-SELECT * FROM alchool;
-
-DELETE FROM alchool WHERE nom = 'red wine';
-
-UPDATE alchool SET prix = 30 WHERE nom = 'whisky';
 
 SELECT * FROM alchool;

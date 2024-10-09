@@ -148,11 +148,11 @@ void create_table(const char *table_name, char *fields, char *response) {
         printf("Fields : %s\n", fields);
         char *token = strtok(fields, ",");
         while (token != NULL) {
-            printf("Token : %s\n", token);
+            // printf("Token : %s\n", token);
             char column_name[BUFFER_SIZE], column_type[BUFFER_SIZE];
             sscanf(token, "%[^:]:%s", column_name, column_type);
-            printf("Column name : %s\n", column_name);
-            printf("Column type : %s\n", column_type);
+            // printf("Column name : %s\n", column_name);
+            // printf("Column type : %s\n", column_type);
             token = strtok(NULL, ",");
         }
 
@@ -658,20 +658,17 @@ void handle_command(const char *command, char *response) {
         char table_name[BUFFER_SIZE];
         char *where_clause = NULL;
         char columns[BUFFER_SIZE];
-        for (int i = 0; cmd_copy[i]; i++) {
-            cmd_copy[i] = tolower((unsigned char)cmd_copy[i]);
-        }
 
-        char *from_ptr = strstr(cmd_copy, "from");
+        char *from_ptr = strstr(cmd_copy, "FROM");
         if (from_ptr) {
-            char *where_ptr = strstr(from_ptr, "where");
+            char *where_ptr = strstr(from_ptr, "WHERE");
             if (where_ptr) {
-                sscanf(from_ptr, "from %s", table_name);
-                where_clause = where_ptr + strlen("where ");
+                sscanf(from_ptr, "FROM %s", table_name);
+                where_clause = where_ptr + strlen("WHERE ");
             } else {
-                sscanf(from_ptr, "from %s", table_name);
+                sscanf(from_ptr, "FROM %s", table_name);
             }
-            char *columns_start = cmd_copy + strlen("select ");
+            char *columns_start = cmd_copy + strlen("SELECT ");
             char *columns_end = from_ptr;
             size_t columns_len = columns_end - columns_start;
             strncpy(columns, columns_start, columns_len);
@@ -804,8 +801,25 @@ int main(int argc, char *argv[]) {
             run_server();
         } else if (strcmp(argv[1], "-u") == 0) {
             client();
+        } else if (strcmp(argv[1], "-f") == 0) {
+            FILE *file = fopen(argv[2], "r");
+            if (!file) {
+                fprintf(stderr, "Error opening file: %s\n", argv[2]);
+                exit(EXIT_FAILURE);
+            }
+
+            char buffer[BUFFER_SIZE];
+            while (fgets(buffer, BUFFER_SIZE, file)) {
+                if (buffer[0] == '\n' || buffer[0] == '#') {
+                    continue;
+                }
+                buffer[strcspn(buffer, "\n")] = 0;
+                handle_command(buffer, buffer);
+                printf("%s\n", buffer);
+            }
+            fclose(file);
         } else {
-            fprintf(stderr, "Commandes : %s [-s | -u]\n", argv[0]);
+            fprintf(stderr, "Commandes : %s [-s | -u | -f]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     } else {
