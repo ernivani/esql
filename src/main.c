@@ -120,7 +120,7 @@ void use_database(const char *db_name, char *response) {
     snprintf(response, BUFFER_SIZE, "Using database: %s", db_name);
 }
 
-void create_table(const char *table_name, const char *fields, char *response) {
+void create_table(const char *table_name, char *fields, char *response) {
     if (strlen(current_db) == 0) {
         snprintf(response, BUFFER_SIZE, "No database selected. Use `USE <db_name>`.");
         return;
@@ -294,7 +294,7 @@ int evaluate_condition(const char *value, Condition condition, const char *colum
     return 0;
 }
 
-void select_from_table(const char *table_name, const char *where_clause, char *output) {
+void select_from_table(const char *table_name, const char *columns, const char *where_clause, char *output) {
     if (strlen(current_db) == 0) {
         snprintf(output, BUFFER_SIZE, "No database selected. Use `USE <db_name>`.");
         return;
@@ -358,10 +358,58 @@ void select_from_table(const char *table_name, const char *where_clause, char *o
         }
     }
 
+    char *selected_columns[MAX_COLUMNS];
+    int selected_column_count = 0;
+    int selected_column_indices[MAX_COLUMNS];
+
+    const char *star = "*";
+
+    if (*columns == *star) {
+        for (int i = 0; i < column_count; i++) {
+            selected_columns[selected_column_count] = strdup(column_names[i]);
+            selected_column_indices[selected_column_count] = i;
+            selected_column_count++;
+        }
+    } else {
+        char *columns_copy = strdup(columns);
+        char *token = strtok(columns_copy, ",");
+        while (token != NULL && selected_column_count < MAX_COLUMNS) {
+            while (isspace(*token)) token++;
+            char *end = token + strlen(token) - 1;
+            while (end > token && isspace(*end)) *end-- = '\0';
+
+            int found = 0;
+            for (int j = 0; j < column_count; j++) {
+                if (strcmp(token, column_names[j]) == 0) {
+                    selected_columns[selected_column_count] = strdup(token);
+                    selected_column_indices[selected_column_count] = j;
+                    selected_column_count++;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                snprintf(output, BUFFER_SIZE, "Column '%s' not found in table '%s'.", token, table_name);
+                fclose(file);
+                for (int k = 0; k < column_count; k++) {
+                    free(column_names[k]);
+                    free(column_types[k]);
+                }
+                for (int k = 0; k < selected_column_count; k++) {
+                    free(selected_columns[k]);
+                }
+                free(columns_copy);
+                return;
+            }
+            token = strtok(NULL, ",");
+        }
+        free(columns_copy);
+    }
+
     strcpy(output, "");
     strcat(output, "Columns:\n");
-    for (int i = 0; i < column_count; i++) {
-        strcat(output, column_names[i]);
+    for (int i = 0; i < selected_column_count; i++) {
+        strcat(output, selected_columns[i]);
         strcat(output, "\t");
     }
     strcat(output, "\nData:\n");
@@ -440,8 +488,9 @@ void select_from_table(const char *table_name, const char *where_clause, char *o
         }
 
         if (row_matches) {
-            for (int i = 0; i < column_count; i++) {
-                strcat(output, row_values[i]);
+            for (int i = 0; i < selected_column_count; i++) {
+                int col_idx = selected_column_indices[i];
+                strcat(output, row_values[col_idx]);
                 strcat(output, "\t");
             }
             strcat(output, "\n");
@@ -452,6 +501,9 @@ void select_from_table(const char *table_name, const char *where_clause, char *o
     for (int i = 0; i < column_count; i++) {
         free(column_names[i]);
         free(column_types[i]);
+    }
+    for (int i = 0; i < selected_column_count; i++) {
+        free(selected_columns[i]);
     }
 }
 
@@ -606,18 +658,26 @@ void handle_command(const char *command, char *response) {
         char table_name[BUFFER_SIZE];
         char *where_clause = NULL;
         char columns[BUFFER_SIZE];
+        for (int i = 0; cmd_copy[i]; i++) {
+            cmd_copy[i] = tolower((unsigned char)cmd_copy[i]);
+        }
 
-        char *from_ptr = strstr(cmd_copy, "FROM");
+        char *from_ptr = strstr(cmd_copy, "from");
         if (from_ptr) {
-            char *where_ptr = strstr(from_ptr, "WHERE");
+            char *where_ptr = strstr(from_ptr, "where");
             if (where_ptr) {
-                sscanf(from_ptr, "FROM %s", table_name);
-                where_clause = where_ptr + strlen("WHERE ");
+                sscanf(from_ptr, "from %s", table_name);
+                where_clause = where_ptr + strlen("where ");
             } else {
-                sscanf(from_ptr, "FROM %s", table_name);
+                sscanf(from_ptr, "from %s", table_name);
             }
-            
-            select_from_table(table_name, where_clause, response);
+            char *columns_start = cmd_copy + strlen("select ");
+            char *columns_end = from_ptr;
+            size_t columns_len = columns_end - columns_start;
+            strncpy(columns, columns_start, columns_len);
+            columns[columns_len] = '\0';
+
+            select_from_table(table_name, columns, where_clause, response);
         } else {
             snprintf(response, BUFFER_SIZE, "Invalid SELECT command syntax.");
         }
